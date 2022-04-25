@@ -50,10 +50,10 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  if(r_scause() == 8) {
     // system call
 
-    if(p->killed)
+    if (p->killed)
       exit(-1);
 
     // sepc points to the ecall instruction,
@@ -77,8 +77,16 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    if ( p->interval && p->handler && !(p->xticks % p->interval)){
+      memmove(&p->preframe,p->trapframe,sizeof p->preframe);
+      p->trapframe->epc = (uint64)p->handler;
+    }
+    p->xticks++;
     yield();
+
+  }
+
 
   usertrapret();
 }
