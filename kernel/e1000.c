@@ -105,8 +105,7 @@ e1000_transmit(struct mbuf *m)
   acquire(&e1000_lock);
   uint32 tail = regs[E1000_TDT];
   // overflowing
-
-  if (tx_ring[tail].status != E1000_TXD_STAT_DD){
+  if (tx_ring[tail].status != E1000_TXD_STAT_DD) {
     release(&e1000_lock);
     return -1;
   }
@@ -117,7 +116,7 @@ e1000_transmit(struct mbuf *m)
   tx_ring[tail].addr = (uint64) tx_mbufs[tail]->head;
   tx_ring[tail].length = (uint16) tx_mbufs[tail]->len;
   tx_ring[tail].cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
-  regs[E1000_TDT] = (tail+1) % TX_RING_SIZE;
+  regs[E1000_TDT] = (tail + 1) % TX_RING_SIZE;
   release(&e1000_lock);
   return 0;
 }
