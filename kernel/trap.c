@@ -3,8 +3,11 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "mmap.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -65,6 +68,30 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if (r_scause() == 0xd){
+    // page fault
+    uint64 fault_va = PGROUNDDOWN(r_stval());
+    struct file *f = 0;
+    int perm = 0;
+    for (int i = 0; i < NMVMA; ++i) {
+      if (p->mvma[i] != 0
+      && (fault_va >= p->mvma[i]->address)
+      && (fault_va <= (p->mvma[i]->address+p->mvma[i]->length)) ) {
+        f = p->mvma[i]->f;
+        perm |= p->mvma[i]->prot;
+      }
+    }
+    uint64 pa = (uint64)kalloc();
+    if(f){
+      acquiresleep(&f->ip->lock);
+      if(readi(f->ip, 0, pa, f->off, PGSIZE) != PGSIZE){
+        kfree((void*)pa);
+        releasesleep(&f->ip->lock);
+      } else{
+        mappages(p->pagetable,fault_va,PGSIZE,pa,perm);
+        releasesleep(&f->ip->lock);
+      }
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

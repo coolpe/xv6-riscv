@@ -30,6 +30,7 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
+  $K/mmap.o \
   $K/virtio_disk.o
 
 OBJS_KCSAN = \
@@ -195,6 +196,11 @@ UPROGS=\
 ifeq ($(LAB),$(filter $(LAB), lock))
 UPROGS += \
 	$U/_stats
+endif
+
+ifeq ($(LAB),$(filter $(LAB), mmap))
+UPROGS += \
+	$U/_mmaptest
 endif
 
 ifeq ($(LAB),traps)

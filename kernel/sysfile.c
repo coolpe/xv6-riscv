@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "mmap.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -466,7 +467,8 @@ sys_pipe(void)
     return -1;
   if(pipealloc(&rf, &wf) < 0)
     return -1;
-  fd0 = -1;
+  fd0 = -1;extern uint64 sys_unmap(void);
+  extern uint64 sys_mmap(void);
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
       p->ofile[fd0] = 0;
@@ -483,4 +485,32 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+uint64 sys_munmap(void){
+  return -1;
+}
+
+/**
+ * void *addr,  //ignore
+ * uint64 length,
+ * int prot,
+ * int flags,
+ * int fd,
+ * uint64 offset //ignore
+ * @return
+ */
+uint64 sys_mmap(void) {
+  struct file *f;
+  int length, prot, flags;
+  uint64 va;
+  if (argint(1, &length) < 0
+      || argint(2, &prot)
+      || argint(3, &flags)
+      || argfd(4, 0, &f) < 0)
+    return -1;
+  if ((va = mmap(0, length, prot, flags, f, 0)) == 0)
+    va = (uint64)((char *) -1);
+
+  return va;
 }
