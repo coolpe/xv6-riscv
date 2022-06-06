@@ -24,6 +24,11 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 
+char *mmap(void *addr, uint64 length, int prot, int flags,
+           int fd, uint64 offset);
+
+int munmap(void *addr, uint64 length);
+
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

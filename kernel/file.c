@@ -19,11 +19,21 @@ struct {
   struct file file[NFILE];
 } ftable;
 
+//struct {
+//  struct spinlock lock;
+//  struct vma vma[NFILE];
+//} vtable;
+
 void
 fileinit(void)
 {
   initlock(&ftable.lock, "ftable");
 }
+//void
+//vmainit(void)
+//{
+//  initlock(&vtable.lock, "vtable");
+//}
 
 // Allocate a file structure.
 struct file*
@@ -42,6 +52,21 @@ filealloc(void)
   release(&ftable.lock);
   return 0;
 }
+//struct vma*
+//vmaalloc(void)
+//{
+//  struct vma *v;
+//
+//  acquire(&vtable.lock);
+//  for(v = vtable.vma; v < vtable.vma + NFILE; v++){
+//    if(v->f == 0){
+//      release(&vtable.lock);
+//      return v;
+//    }
+//  }
+//  release(&vtable.lock);
+//  return 0;
+//}
 
 // Increment ref count for file f.
 struct file*
@@ -54,7 +79,11 @@ filedup(struct file *f)
   release(&ftable.lock);
   return f;
 }
-
+//void
+//vmaclose(struct vma *v)
+//{
+//    v->f = 0;
+//}
 // Close file f.  (Decrement ref count, close when reaches 0.)
 void
 fileclose(struct file *f)

@@ -484,3 +484,39 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64 sys_mmap(void) {
+    struct file *f;
+    int length, prot, flags;
+    uint64 error = 0xffffffffffffffff;
+    if (argint(1, &length) < 0
+        || argint(2, &prot)
+        || argint(3, &flags)
+        || argfd(4, 0, &f) < 0)
+        return -1;
+    if (f->writable == 0 && prot & PROT_WRITE && flags & MAP_SHARED)
+        return error;
+    struct proc* p=myproc();
+    for(uint i=0;i<NFILE;i++)
+    {
+        struct vma *v=&p->mvma[i]	;
+        if(!v->f) //find an unsed vma
+        {
+            // store relative auguments
+            v->address=p->sz;//use p->sz to p->sz+len to map the file
+            length= PGROUNDUP(length);// map的最小单位是PGSIZE
+            p->sz+=length;
+            v->length=length;
+            v->prot=prot;
+            v->flags=flags;
+            v->f= filedup(f);//increase the file's ref cnt
+            return v->address;
+        }
+    }
+
+    return error;
+}
+
+uint64 sys_munmap(void) {
+    return -1;
+}
