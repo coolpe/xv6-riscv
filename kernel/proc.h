@@ -115,4 +115,5 @@ struct proc {
   struct vma mvma[NOFILE];     // Map vma
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct vma *mvma[NMVMA];      // Map vmas
 };
