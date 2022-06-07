@@ -88,7 +88,7 @@ struct vma {
     int prot;
     int flags;
     struct file *f;
-    uint64 sp;
+    uint64 off;
 };
 
 // Per-process state
@@ -115,5 +115,4 @@ struct proc {
   struct vma mvma[NOFILE];     // Map vma
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  struct vma *mvma[NMVMA];      // Map vmas
 };

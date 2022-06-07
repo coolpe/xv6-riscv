@@ -3,8 +3,12 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "fs.h"
+#include "file.h"
 
 struct cpu cpus[NCPU];
 
@@ -281,6 +285,13 @@ fork(void)
     return -1;
   }
 
+  for(i = 0; i < NOFILE; i++){
+    if(p->mvma[i].f){
+      memmove(&np->mvma[i],&p->mvma[i],sizeof(struct vma));
+      filedup(p->mvma[i].f);
+    }
+  }
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -299,6 +310,7 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
+
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
@@ -344,6 +356,7 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
+
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
@@ -353,6 +366,16 @@ exit(int status)
     }
   }
 
+  for(int i=0;i<NOFILE ; i++)
+  {
+    struct vma *v=&p->mvma[i];
+    //only unmap at start,end or the whole region
+    if(v->f)
+    {
+      uvmunmap(p->pagetable,v->address,v->length / PGSIZE,0);
+      memset(v,0,sizeof(struct vma));
+    }
+  }
   begin_op();
   iput(p->cwd);
   end_op();

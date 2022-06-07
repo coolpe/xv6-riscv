@@ -488,35 +488,96 @@ sys_pipe(void)
 uint64 sys_mmap(void) {
     struct file *f;
     int length, prot, flags;
-    uint64 error = 0xffffffffffffffff;
     if (argint(1, &length) < 0
         || argint(2, &prot)
         || argint(3, &flags)
         || argfd(4, 0, &f) < 0)
         return -1;
     if (f->writable == 0 && prot & PROT_WRITE && flags & MAP_SHARED)
-        return error;
+        return -1;
     struct proc* p=myproc();
-    for(uint i=0;i<NFILE;i++)
+    for(uint i=0;i<NOFILE;i++)
     {
-        struct vma *v=&p->mvma[i]	;
+        struct vma *v=&p->mvma[i];
         if(!v->f) //find an unsed vma
         {
             // store relative auguments
-            v->address=p->sz;//use p->sz to p->sz+len to map the file
+            v->address= PGROUNDUP(p->sz) ;//use p->sz to p->sz+len to map the file
             length= PGROUNDUP(length);// map的最小单位是PGSIZE
-            p->sz+=length;
+            p->sz =PGROUNDUP(p->sz) + length;
             v->length=length;
             v->prot=prot;
             v->flags=flags;
             v->f= filedup(f);//increase the file's ref cnt
+            v->off = 0;
             return v->address;
         }
     }
-
-    return error;
-}
-
-uint64 sys_munmap(void) {
     return -1;
+}
+/**
+ * Implement munmap: find the VMA for the address range and unmap the specified pages (hint: use uvmunmap).
+ * If munmap removes all pages of a previous mmap,
+ * it should decrement the reference count of the corresponding struct file.
+ * If an unmapped page has been modified and the file is mapped MAP_SHARED,
+ * write the page back to the file. Look at filewrite for inspiration.
+ * @return
+ */
+uint64 sys_munmap(void) {
+  uint64 addr;
+  int length;
+  if (argaddr(0, &addr) < 0
+      || argint(1, &length) < 0)
+    return -1;
+  struct proc *p = myproc();
+  addr = PGROUNDDOWN(addr);
+  length = PGROUNDUP(length);
+  for (uint i = 0; i < NOFILE; i++) {
+    struct vma *v = &p->mvma[i];
+    if (v->f
+        && (addr >= v->address)
+        && (addr <= (v->address + v->length))) {
+      if (v->flags & MAP_SHARED){
+        int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+        int i = 0,r = 0;
+        int n = length;
+        uint64 off = v->off + addr - v->address;
+        while(i < n){
+          int n1 = n - i;
+          if(n1 > max)
+            n1 = max;
+
+          begin_op();
+          ilock(v->f->ip);
+          if ((r = writei(v->f->ip, 1, addr + i, off, n1)) > 0)
+            off += r;
+          iunlock(v->f->ip);
+          end_op();
+
+          if(r != n1){
+            // error from writei
+            break;
+          }
+          i += r;
+        }
+      }
+
+
+      if (addr == v->address){
+        v->address +=length;
+        v->off += length;
+      }
+
+      if (length == v->length) {
+        fileclose(v->f);
+        memset(v,0,sizeof(struct vma));
+        uvmunmap(p->pagetable, addr, length / PGSIZE, 0);
+        return 0;
+      }
+      v->length -=length;
+      uvmunmap(p->pagetable, addr, length / PGSIZE, 0);
+      return 0;
+    }
+  }
+  return -1;
 }

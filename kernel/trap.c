@@ -71,34 +71,41 @@ usertrap(void)
     // ok
 
   } else if(r_scause()==13 || r_scause()==15){
-      //page fault
-      uint64 fault_va = r_stval();
+    //page fault
+    uint64 fault_va = r_stval();
 
-      for(uint i=0;i<NFILE;i++)
-      {
+    if (fault_va > p->sz && fault_va < (uint64) p->trapframe) {
+    }else {
+      int lazy = 0;
+      for (uint i = 0; i < NOFILE; i++) {
+        struct vma *v = &p->mvma[i];
+        if (v->f && (fault_va >= v->address) && (fault_va < (v->address + v->length))) //find vma
+        {
+          char *pa = kalloc();
+          memset(pa, 0, PGSIZE);
           fault_va = PGROUNDDOWN(fault_va);
-          struct vma *v=&p->mvma[i]	;
-          uint64 off=v->sp+fault_va-v->address;
-          if (v->f && (fault_va >= v->address) && (fault_va <= (v->address + v->length))) //find vma
-          {
-              char* pa = kalloc();
-              memset(pa,0,PGSIZE);
-              if(mappages(p->pagetable,fault_va,PGSIZE,(uint64)pa,(v->prot<<1) |PTE_U) !=0){
-                  kfree((void *) pa);
-                  goto err;
-              } else{
-                  ilock(v->f->ip);
-                  readi(v->f->ip,1,fault_va,off,PGSIZE);
-                  iunlock(v->f->ip);
-                  break;
-              }
-
+          uint64 off = v->off + fault_va - v->address;
+          if (mappages(p->pagetable, fault_va, PGSIZE, (uint64) pa, (v->prot << 1) | PTE_U) != 0) {
+            kfree((void *) pa);
+            goto err;
+          } else {
+            ilock(v->f->ip);
+            readi(v->f->ip, 1, fault_va, off, PGSIZE);
+            iunlock(v->f->ip);
+            lazy = 1;
+            break;
           }
+        }
       }
+      if (!lazy)
+        goto err;
+    }
+
   } else {
-      err:      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      p->killed = 1;
+    err:
+    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    p->killed = 1;
   }
 
   if(p->killed)
